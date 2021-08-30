@@ -1,16 +1,7 @@
-#  Copyright (c) 2021 PPViT Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+'''
+    Created on: 05.07.2021
+    @Author: feizzhang
+'''
 
 import paddle
 import paddle.nn as nn
@@ -18,7 +9,7 @@ import paddle.nn.functional as F
 from paddle.nn.initializer import Normal
 
 import sys
-sys.path.append("PPViT-od_head/object_detection/head")
+sys.path.append("PPViT-od_head/object_detection/ODHead")
 from det_utils.generator_utils import AnchorGenerator, ProposalGenerator
 from det_utils.target_assign import anchor_target_assign
 
@@ -114,8 +105,12 @@ class RPNHead(nn.Layer):
             inputs (dict): ground truth info.
         '''
         proposal_gen = self.train_proposal if self.training else self.test_proposal
+
         imgs_shape = inputs["imgs_shape"]
-        batch_size = imgs_shape.shape[0]
+        if isinstance(imgs_shape, list):
+            imgs_shape = paddle.stack(imgs_shape).astype("float32")
+
+        batch_size = len(imgs_shape)
 
         batch_proposal_rois = []
         batch_proposal_rois_num = []
@@ -129,7 +124,7 @@ class RPNHead(nn.Layer):
                     bbox_deltas = level_deltas[i:i+1],
                     anchors = level_anchors,
                     imgs_shape = imgs_shape[i:i+1]
-                    )
+                )
                 if level_rois.shape[0] > 0:
                     single_img_rois_list.append(level_rois)
                     single_img_prob_list.append(level_rois_prob)
@@ -165,7 +160,7 @@ class RPNHead(nn.Layer):
             positive_fraction = self.config.RPN.POSITIVE_FRACTION,
             allow_low_quality_matches = self.config.RPN.LOW_QUALITY_MATCHES,
             is_crowd = is_crowd
-            )
+        )
 
         # reshape to [N, Hi * Wi * A, 1] for compute loss
         pred_scores = [
@@ -197,7 +192,7 @@ class RPNHead(nn.Layer):
                 logit=pred_scores, 
                 label=tgt_scores, 
                 reduction="sum"
-                )
+            )
 
         if pos_idx.shape[0] == 0:
             loss_rpn_reg = paddle.zeros([1]).astype("float32")
